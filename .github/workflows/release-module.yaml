@@ -15,8 +15,12 @@ on:
 env:
   TEMP_BRANCH_NAME: temp-branch
 
+permissions:
+  contents: write
+
 jobs:
   release-module:
+    name: Release module '${{ inputs.module_name }}/v${{ inputs.version }}'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -58,8 +62,6 @@ jobs:
           TAG_NAME="${{ inputs.module_name }}/v${{ inputs.version }}"
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clean temporary branch
         if: always()
