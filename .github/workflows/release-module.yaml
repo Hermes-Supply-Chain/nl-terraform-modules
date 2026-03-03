@@ -32,7 +32,7 @@ jobs:
           fi
 
       - name: Create temporary branch
-        run: git create --orphan ${{ env.TEMP_BRANCH_NAME }}
+        run: git checkout --orphan ${{ env.TEMP_BRANCH_NAME }}
 
       - name: Remove all files
         run: git rm -rf .
