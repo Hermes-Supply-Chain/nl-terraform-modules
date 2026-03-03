@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   release-module:
-    name: Release module '${{ inputs.module_name }}/v${{ inputs.version }}'
+    name: Release '${{ inputs.module_name }}/v${{ inputs.version }}'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
