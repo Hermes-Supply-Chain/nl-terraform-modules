@@ -6,11 +6,11 @@ from teams_alert_helper import TeamsAlertHelper
 from config import Config
 from flask import Response, Request
 from google import genai
-import ast
 import json
 import logging
 from nl_digital_platform_lib.gcp_json_logging import nxt_setup_logging
 import traceback
+from dataclasses import replace
 
 nxt_setup_logging()
 logging.getLogger(__package__).setLevel("INFO")
@@ -43,7 +43,9 @@ def main_classic(config: Config) -> Response:
     new_errors = current_error_report.get_new_errors(last_error_report)
     if new_errors.error_groups:
         teams_alert_helper.notify_errors(
-            new_errors.error_groups, "New errors found in Error Reporting!"
+            new_errors.error_groups, 
+            "New errors found in Error Reporting!", 
+            config.project_id,
         )
 
     spiked_errors = current_error_report.get_spiked_errors(
@@ -54,6 +56,7 @@ def main_classic(config: Config) -> Response:
         teams_alert_helper.notify_errors(
             spiked_errors.error_groups,
             f"Found errors with a {config.error_increase_threshold * 100}% increase!",
+            config.project_id,
         )
 
     return Response(status=200)
@@ -80,11 +83,15 @@ def main_ai(config: Config) -> Response:
     model = "gemini-2.5-flash"
     message = f"""
     You are looking at a Google Cloud projects Error Reporting page grouped into error groups. 
-    Your function is to evaluate if a developer needs to IMMEDIATELY look at one or more of these error groups if they are very critical. 
-    The structure of the input data is a dictionary with the Error Report group id as the key and the Error Report as the value. 
-    Only return the keys that will trigger a notification as a string representation of a Python list or else an empty list. (Will be read with ast.literal_eval)
+    Your function is to evaluate if a developer needs to IMMEDIATELY look at one or more of these error groups if they are critical. 
+    The structure of the input data is a dictionary with the Error Report group id as the key and the Error Report as the value.
+    Return a dict[str, str] with the Error Report group id as the key of the error you deem critical and the value your reasoning why it is critical or possible fix, in less than 300 chars.
+    If no errors are critical, then return an empty dict. Your response will be read by json.loads()!
+    Do not include any text before or after the JSON. 
+    Do not use markdown code blocks.
+    Example: {{"key": "value"}}
     This is the data:
-    {json.dumps(current_error_report.error_groups)}
+    {current_error_report.get_errors_as_string()}
     """
     response = genai_client.models.generate_content(model=model, contents=message)
     logger.info("Sent message to Vertex AI: %s", message)
@@ -92,15 +99,27 @@ def main_ai(config: Config) -> Response:
     genai_client.close()
     response_text = response.text or ""
     logger.info("AI response: " + response_text)
-    critical_error_group_ids: list[str] = ast.literal_eval(response_text)
-    if not critical_error_group_ids:
+
+    try:
+        # AI is instructed to return the error group id as the key, and its reasoning as the value
+        ai_critical_errors: dict[str, str] = json.loads(response_text)
+    except ValueError:
+        return Response("AI output could not be read as JSON", status=500)
+
+    if not ai_critical_errors:
         return Response("AI has deemed no error as critical", status=200)
+
+    # filter current error groups dict, and append AI reasoning to display in Teams
     critical_errors = {
-        k: current_error_report[k]
-        for k in critical_error_group_ids
-        if k in current_error_report
+        key: replace(current_error_report.error_groups[key], ai_reasoning=value)
+        for key, value in ai_critical_errors.items()
+        if key in current_error_report.error_groups
     }
-    teams_alert_helper.notify_errors(critical_errors, "Critical errors flagged by AI:")
+    teams_alert_helper.notify_errors(
+        critical_errors,
+        "Critical errors flagged by AI!",
+        config.project_id,
+    )
     return Response(status=200)
 
 

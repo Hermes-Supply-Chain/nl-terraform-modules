@@ -9,10 +9,11 @@ from typing import Any
 
 
 @dataclass
-class ErrorGroupData(dict):
+class ErrorGroupData:
     count: int
     message: str
     affected_service: str
+    ai_reasoning: str = ""
 
 
 class ErrorReport:
@@ -54,14 +55,19 @@ class ErrorReport:
 
         return ErrorReport(spiked_errors)
 
+    def get_errors_as_string(self) -> str:
+        serializable = {key: asdict(value) for key, value in self.error_groups.items()}
+        return json.dumps(serializable)
+
     def serialize_error_report(self) -> bytes:
-        serializable = {k: asdict(v) for k, v in self.error_groups.items()}
-        return json.dumps(serializable).encode("utf-8")
+        return self.get_errors_as_string().encode("utf-8")
 
     @staticmethod
     def deserialize_error_report(data: bytes) -> "ErrorReport":
         decoded: dict[str, dict[str, Any]] = json.loads(data)
-        return ErrorReport({k: ErrorGroupData(**v) for k, v in decoded.items()})
+        return ErrorReport(
+            {key: ErrorGroupData(**value) for key, value in decoded.items()}
+        )
 
 
 class ErrorReportClient:
