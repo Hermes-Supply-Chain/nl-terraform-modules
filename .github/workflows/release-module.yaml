@@ -1,16 +1,9 @@
 name: Release Terraform Module
 
 on:
-  workflow_dispatch:
-    inputs:
-      module_name:
-        description: Name of the module to release, must exist in modules/ dir
-        required: true
-        type: string
-      version:
-        description: Version of the module to release. Should adhere to semantic versioning ("M.m.p")
-        required: true
-        type: string
+  push:
+    branches:
+      - main
 
 env:
   TEMP_BRANCH_NAME: temp-branch
@@ -19,19 +12,52 @@ permissions:
   contents: write
 
 jobs:
-  release-module:
-    name: Release '${{ inputs.module_name }}/v${{ inputs.version }}'
+  find-changed-module-jsons:
     runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.build-matrix.outputs.modules }}
+
+    steps:
+      - name: Find changed module.json's
+        id: find-module-jsons
+        uses: tj-actions/changed-files@v47.0.4
+        with:
+          files: modules/*/module.json
+          dir_names: true
+          dir_names_exclude_current_dir: true
+          dir_names_max_depth: 2
+          json: true
+
+      - name: Build matrix
+        id: build-matrix
+        run: |
+          CHANGED_MODULE_JSONS="${{ steps.find-module-jsons.outputs.all_changed_and_modified_files }}"
+          MODULES=$(echo "$CHANGED_MODULE_JSONS" | jq -r '.[]' | while read -r path; do
+            name=$(echo "$path" | cut -d'/' -f2)
+            version=$(jq -r '.version' "$path")
+            echo "{\"name\":\"$name\",\"version\":\"$version\"}"
+          done | jq -s '.')
+          echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
+
+  release-module:
+    name: Release '${{ matrix.module.name }}/v${{ matrix.module.version }}'
+    runs-on: ubuntu-latest
+    needs: find-changed-module-jsons
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.find-changed-module-jsons.outputs.modules) }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0 # fetch entire history
 
-      - name: Validate input module name
+      - name: Validate module version
         run: |
-          if [ ! -d "modules/${{ inputs.module_name }}" ]; then
-            echo "Error: Module '${{ inputs.module_name }}' does not exist!"
+          if git tag | grep -qx "${{ matrix.module.name }}/v${{ matrix.module.version }}"; then
+            echo "Tag '${{ matrix.module.name }}/v${{ matrix.module.version }}' already exists! Exiting..."
             exit 1
           fi
 
@@ -48,18 +74,18 @@ jobs:
 
       - name: Copy module to root
         run: |
-          git checkout main -- modules/${{ inputs.module_name }}
-          mv modules/${{ inputs.module_name }}/* .
+          git checkout main -- modules/${{ matrix.module.name }}
+          mv modules/${{ matrix.module.name }}/* .
           rm -rf modules
 
       - name: Commit module files
         run: |
           git add .
-          git commit -m "(CI) Release ${{ inputs.module_name }} v${{ inputs.version }}"
+          git commit -m "(CI) Release ${{ matrix.module.name }} v${{ matrix.module.version }}"
 
       - name: Create and push tag
         run: |
-          TAG_NAME="${{ inputs.module_name }}/v${{ inputs.version }}"
+          TAG_NAME="${{ matrix.module.name }}/v${{ matrix.module.version }}"
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"
 
