@@ -31,6 +31,7 @@ jobs:
           dir_names: true
           dir_names_exclude_current_dir: true
           dir_names_max_depth: 2
+          json: true
 
       - name: Build matrix
         id: build-matrix
@@ -38,9 +39,9 @@ jobs:
           CHANGED_MODULE_JSONS="${{ steps.find-module-jsons.outputs.all_changed_and_modified_files }}"
           MODULES=$(echo "$CHANGED_MODULE_JSONS" | jq -r '.[]' | while read -r path; do
             name=$(echo "$path" | cut -d'/' -f2)
-            version=$(jq -r '.version' "$path")
+            version=$(jq -r '.version' "$path/module.json")
             echo "{\"name\":\"$name\",\"version\":\"$version\"}"
-          done | jq -s '.')
+          done | jq -c -s '.')
           echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
 
   release-module:
