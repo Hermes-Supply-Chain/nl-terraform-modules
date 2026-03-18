@@ -18,6 +18,9 @@ jobs:
       modules: ${{ steps.build-matrix.outputs.modules }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
       - name: Find changed module.json's
         id: find-module-jsons
         uses: tj-actions/changed-files@v47.0.4
