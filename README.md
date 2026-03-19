@@ -17,7 +17,7 @@ Set the source of the module to this repository, setting the `ref` to the name a
 
 ```
 module "source_zip" {
-  source        = "github.com/Hermes-Supply-Chain/nl-terraform-modules?ref=source_zip/v1.0.0"
+  source = "git::https://github.com/Hermes-Supply-Chain/nl-terraform-modules?ref=source_zip/v1.0.0"
   (...)
 }
 ```
