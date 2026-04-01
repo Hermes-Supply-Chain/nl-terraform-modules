@@ -78,8 +78,7 @@ class ErrorReportClient:
         self.project_id = project_id
         self.client = client
 
-    def request_error_report(self, period: int) -> ErrorReport:
-        time_range = QueryTimeRange(period=period)
+    def request_error_report(self, time_range: QueryTimeRange) -> ErrorReport:
         page_size = 1000
         error_report_request = ListGroupStatsRequest(
             project_name=f"projects/{self.project_id}",
