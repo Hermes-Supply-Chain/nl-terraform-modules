@@ -1,6 +1,6 @@
-from google.cloud.errorreporting_v1beta1 import ErrorStatsServiceClient
+from google.cloud.errorreporting_v1beta1 import ErrorStatsServiceClient, QueryTimeRange
 import functions_framework
-from error_reporting import ErrorReportClient
+from error_reporting import ErrorReportClient, ErrorReport
 from storage_helper import StorageHelper
 from teams_alert_helper import TeamsAlertHelper
 from config import Config
@@ -26,10 +26,11 @@ def main_classic(config: Config) -> Response:
     teams_alert_helper = TeamsAlertHelper(config.teams_webhook_url)
     logger.info("Helpers initialized...")
 
-    current_error_report = error_report_client.request_error_report(
-        config.request_period
+    time_range = QueryTimeRange(period=config.request_period)
+    current_error_report = error_report_client.request_error_report(time_range)
+    logger.info(
+        f"Fetched error report with {len(current_error_report.error_groups)} groups..."
     )
-    logger.info(f"Fetched error report with {len(current_error_report)} groups...")
 
     last_error_report_bytes = storage_helper.get_last_cache_file_as_bytes()
     storage_helper.save_bytes_to_cache(current_error_report.serialize_error_report())
@@ -37,14 +38,12 @@ def main_classic(config: Config) -> Response:
     if last_error_report_bytes is None:
         return Response("No cached report found, sending no alert", status=200)
 
-    last_error_report = ErrorReportClient.deserialize_error_report(
-        last_error_report_bytes
-    )
+    last_error_report = ErrorReport.deserialize_error_report(last_error_report_bytes)
     new_errors = current_error_report.get_new_errors(last_error_report)
     if new_errors.error_groups:
         teams_alert_helper.notify_errors(
-            new_errors.error_groups, 
-            "New errors found in Error Reporting!", 
+            new_errors.error_groups,
+            "New errors found in Error Reporting!",
             config.project_id,
         )
 
@@ -70,8 +69,10 @@ def main_ai(config: Config) -> Response:
     teams_alert_helper = TeamsAlertHelper(config.teams_webhook_url)
     logger.info("Helpers initialized...")
 
-    current_error_report = error_report_client.request_error_report(
-        config.request_period
+    time_range = QueryTimeRange(period=config.request_period)
+    current_error_report = error_report_client.request_error_report(time_range)
+    logger.info(
+        f"Fetched error report with {len(current_error_report.error_groups)} groups..."
     )
 
     genai_client = genai.Client(
@@ -82,10 +83,12 @@ def main_ai(config: Config) -> Response:
     # see: https://raw.githubusercontent.com/googleapis/python-genai/refs/heads/main/codegen_instructions.md
     model = "gemini-2.5-flash"
     message = f"""
-    You are looking at a Google Cloud projects Error Reporting page grouped into error groups. 
-    Your function is to evaluate if a developer needs to IMMEDIATELY look at one or more of these error groups if they are critical. 
+    You are looking at a Google Cloud projects Error Reporting page grouped into error groups.
     The structure of the input data is a dictionary with the Error Report group id as the key and the Error Report as the value.
-    Return a dict[str, str] with the Error Report group id as the key of the error you deem critical and the value your reasoning why it is critical or possible fix, in less than 300 chars.
+    Your function is to evaluate if any of the provided error groups have spiked in error count.
+    You do that by looking at the provided timestamps to see if there are sudden spikes. If there is a constant flow of events, they may be ignored.
+    For context, the range of events sent is '{time_range.period.name}'.
+    Return a dict[str, str] with the Error Report group id as the key of the error you deem critical and set the value to your reasoning why it is critical or possible fix, in less than 300 chars.
     If no errors are critical, then return an empty dict. Your response will be read by json.loads()!
     Do not include any text before or after the JSON. 
     Do not use markdown code blocks.

@@ -1,8 +1,10 @@
 from google.cloud.errorreporting_v1beta1 import ErrorStatsServiceClient
 from google.cloud.errorreporting_v1beta1.types import (
+    ListEventsRequest,
     ListGroupStatsRequest,
     QueryTimeRange,
 )
+from google.api_core.datetime_helpers import to_milliseconds
 import json
 from dataclasses import dataclass, asdict
 from typing import Any
@@ -13,6 +15,7 @@ class ErrorGroupData:
     count: int
     message: str
     affected_service: str
+    timestamps: list[int]
     ai_reasoning: str = ""
 
 
@@ -75,18 +78,33 @@ class ErrorReportClient:
         self.project_id = project_id
         self.client = client
 
-    def request_error_report(self, period: int) -> ErrorReport:
+    def request_error_report(self, time_range: QueryTimeRange) -> ErrorReport:
+        page_size = 1000
         error_report_request = ListGroupStatsRequest(
             project_name=f"projects/{self.project_id}",
-            time_range=QueryTimeRange(period=period),
-            page_size=1000,
+            time_range=time_range,
+            page_size=page_size,
         )
         error_report_pager = self.client.list_group_stats(request=error_report_request)
         error_report_groups: dict[str, ErrorGroupData] = {}
         for error_report in error_report_pager:
+            error_group_events_request = ListEventsRequest(
+                project_name=f"projects/{self.project_id}",
+                group_id=error_report.group.group_id,
+                time_range=time_range,
+                page_size=page_size,
+            )
+            error_events_pager = self.client.list_events(
+                request=error_group_events_request
+            )
+            error_time_stamps: list[int] = []
+            for error_event in error_events_pager:
+                error_time_stamps.append(to_milliseconds(error_event.event_time))
+
             error_report_groups[error_report.group.group_id] = ErrorGroupData(
                 message=error_report.representative.message,
                 count=error_report.count,
                 affected_service=error_report.representative.service_context.service,
+                timestamps=error_time_stamps,
             )
         return ErrorReport(error_report_groups)
