@@ -1,6 +1,6 @@
 from google.cloud.errorreporting_v1beta1 import ErrorStatsServiceClient, QueryTimeRange
 import functions_framework
-from error_reporting import ErrorReportClient, ErrorReport
+from error_reporting import ErrorGroupData, ErrorReportClient, ErrorReport
 from storage_helper import StorageHelper
 from teams_alert_helper import TeamsAlertHelper
 from config import Config
@@ -120,7 +120,7 @@ def main_ai(config: Config) -> Response:
     }
     teams_alert_helper.notify_errors(
         critical_errors,
-        "Critical errors flagged by AI!",
+        "Error spikes found by AI!",
         config.project_id,
     )
     return Response(status=200)
@@ -135,3 +135,23 @@ def main(_request: Request) -> Response:
         logger.error("Exception: %s", e)
         logger.exception(traceback.format_exc())
         return Response("Internal Server Error", status=500)
+
+def main_local():
+    error_report_client = ErrorReportClient(
+        "nl-event-service-npr-416913", ErrorStatsServiceClient()
+    )
+    # time_range = QueryTimeRange(period=3)
+    # current_error_report = error_report_client.request_error_report(time_range)
+    # print(current_error_report.get_errors_as_string())
+    teams_alert_helper = TeamsAlertHelper("https://prod-98.westeurope.logic.azure.com:443/workflows/d87c52cc77d94ccabea156f242ab93bd/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=um294cwX-C7gYMZ2DV7um9yVdwso7fFX8dwWPMJgJ6k")
+    error: ErrorGroupData = ErrorGroupData(count=1234, message="Exception on / [POST]\nTraceback", affected_service="foobar", ai_reasoning="foobar", timestamps=[1234,6789])
+    critical_errors: dict[str, ErrorGroupData] = {"CIGbjMXbla-0KQ": error, "CIGbjMXbla-asd": error}
+                                                  
+    teams_alert_helper.notify_errors(
+        critical_errors,
+        "Test",
+        "nl-event-service-npr-416913",
+    )
+    
+if __name__ == "__main__":
+    main_local()

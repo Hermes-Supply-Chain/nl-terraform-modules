@@ -2,6 +2,7 @@ import requests
 from error_reporting import ErrorGroupData
 
 
+# see: https://adaptivecards.microsoft.com/designer
 class TeamsAlertHelper:
     def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
@@ -13,18 +14,33 @@ class TeamsAlertHelper:
         project: str,
     ) -> dict[str, object]:
         error_blocks = []
-        for error in errors.values():
+        for group_id, error in errors.items():
             facts = [
-                {
-                    "title": "Service",
-                    "value": f"{error.affected_service} (reported {error.count} times)",
-                },
+                {"title": "Service", "value": error.affected_service},
                 {"title": "Message", "value": f"{error.message[:100]}..."},
             ]
             if error.ai_reasoning:
                 facts.append({"title": "AI response", "value": error.ai_reasoning})
 
-            error_blocks.append({"type": "FactSet", "separator": True, "facts": facts})
+            error_blocks.append(
+                {
+                    "type": "Container",
+                    "separator": True,
+                    "items": [
+                        {"type": "FactSet", "facts": facts},
+                        {
+                            "type": "ActionSet",
+                            "actions": [
+                                {
+                                    "type": "Action.OpenUrl",
+                                    "title": "Open in Google Cloud Console",
+                                    "url": f"https://console.cloud.google.com/errors/{group_id}?project={project}",
+                                }
+                            ],
+                        },
+                    ],
+                }
+            )
 
         return {
             "type": "message",
@@ -36,6 +52,7 @@ class TeamsAlertHelper:
                         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
                         "type": "AdaptiveCard",
                         "version": "1.5",
+                        "msteams": {"width": "Full"},
                         "body": [
                             {
                                 "type": "TextBlock",
@@ -48,8 +65,7 @@ class TeamsAlertHelper:
                                 "type": "TextBlock",
                                 "text": f"Project: {project}",
                                 "size": "Medium",
-                                "weight": "Bolder",
-                                "separator": True,
+                                "isSubtle": True,
                             },
                             *error_blocks,
                         ],

@@ -23,6 +23,7 @@ resource "google_cloudfunctions2_function" "this" {
     available_cpu      = var.recource_limits.cpu
     min_instance_count = 1
     max_instance_count = 1
+    timeout_seconds    = 600
   }
 
   build_config {
@@ -42,7 +43,7 @@ resource "google_cloud_scheduler_job" "this" {
   project   = var.project
   region    = var.region
   schedule  = var.schedule
-  time_zone = "UTC"
+  time_zone = "Europe/Berlin"
 
   http_target {
     http_method = "GET"
