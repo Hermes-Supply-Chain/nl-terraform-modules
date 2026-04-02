@@ -47,21 +47,6 @@ variable "recource_limits" {
   }
 }
 
-variable "evaluation_by_ai" {
-  type        = bool
-  description = <<-EOT
-Select one of two possible ways to interpret the error report. 
-If set to true, send the error report to an AI, which is prompted to decide whether a critical error worth of sending a notification is found or not. 
-If set to false, new errors and errors exceeding the error_increase_threshold will be sent."
-EOT
-}
-
-variable "error_increase_threshold" {
-  type        = number
-  description = "The factor of error increase, that will be seen as a spike, and be reported. Ex: 0.5 = 50% (and above) more errors than the day before will be reported"
-  default     = 0.5
-}
-
 variable "error_report_request_period" {
   type        = number
   description = "Google takes a period input based on an int: PERIOD_1_HOUR = 1, PERIOD_6_HOURS = 2, PERIOD_1_DAY = 3, PERIOD_1_WEEK = 4, PERIOD_30_DAYS = 5"
