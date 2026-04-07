@@ -12,11 +12,9 @@ resource "google_cloudfunctions2_function" "this" {
     environment_variables = {
       LOG_EXECUTION_ID         = "false" // recommended is true, however this breaks structured logging(no logs at all)
       CACHE_BUCKET             = var.bucket_name
-      ERROR_INCREASE_THRESHOLD = var.error_increase_threshold
       TEAMS_WEBHOOK_URL        = var.teams_webhook_url
       PROJECT_ID               = var.project
       REGION                   = var.region
-      USE_AI                   = var.evaluation_by_ai
       REQUEST_PERIOD           = var.error_report_request_period
     }
     available_memory   = var.recource_limits.memory
