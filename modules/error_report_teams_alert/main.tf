@@ -11,11 +11,12 @@ resource "google_cloudfunctions2_function" "this" {
     service_account_email = data.google_service_account.this.email
     environment_variables = {
       LOG_EXECUTION_ID         = "false" // recommended is true, however this breaks structured logging(no logs at all)
-      CACHE_BUCKET             = var.bucket_name
       TEAMS_WEBHOOK_URL        = var.teams_webhook_url
       PROJECT_ID               = var.project
       REGION                   = var.region
       REQUEST_PERIOD           = var.error_report_request_period
+      RESPONSE_CODES_TO_FILTER = join(",", var.response_codes_to_filter)
+      AI_MODEL_ID              = var.ai_model_id
     }
     available_memory   = var.recource_limits.memory
     available_cpu      = var.recource_limits.cpu

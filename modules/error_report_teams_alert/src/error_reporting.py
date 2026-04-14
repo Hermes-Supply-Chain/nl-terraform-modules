@@ -33,7 +33,11 @@ class ErrorReportClient:
         self.project_id = project_id
         self.client = client
 
-    def request_error_report(self, time_range: QueryTimeRange) -> ErrorReport:
+    def request_error_report(
+        self,
+        time_range: QueryTimeRange,
+        response_codes_to_filter: list[int] = [],
+    ) -> ErrorReport:
         page_size = 1000
         error_report_request = ListGroupStatsRequest(
             project_name=f"projects/{self.project_id}",
@@ -43,6 +47,12 @@ class ErrorReportClient:
         error_report_pager = self.client.list_group_stats(request=error_report_request)
         error_report_groups: dict[str, ErrorGroupData] = {}
         for error_report in error_report_pager:
+            if (
+                error_report.representative.context.http_request.response_status_code
+                in response_codes_to_filter
+            ):
+                continue
+
             error_group_events_request = ListEventsRequest(
                 project_name=f"projects/{self.project_id}",
                 group_id=error_report.group.group_id,
@@ -58,7 +68,9 @@ class ErrorReportClient:
 
             error_report_groups[error_report.group.group_id] = ErrorGroupData(
                 message=error_report.representative.message,
-                affected_services=[service.service for service in error_report.affected_services],
+                affected_services=[
+                    service.service for service in error_report.affected_services
+                ],
                 timestamps=error_time_stamps,
             )
         return ErrorReport(error_report_groups)
