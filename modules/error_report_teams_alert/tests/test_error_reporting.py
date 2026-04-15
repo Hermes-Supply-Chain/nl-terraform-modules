@@ -1,5 +1,5 @@
 import pytest
-from src.error_reporting import ErrorReport, ErrorReportClient, ErrorGroupData
+from src.error_reporting import ErrorReport, ErrorReportClient
 from google.cloud.errorreporting_v1beta1 import (
     ErrorStatsServiceClient,
     QueryTimeRange,
@@ -9,6 +9,8 @@ from google.cloud.errorreporting_v1beta1 import (
     ErrorGroup,
     ListGroupStatsRequest,
     ListEventsRequest,
+    ErrorContext,
+    HttpRequestContext,
 )
 from google.cloud.errorreporting_v1beta1.types import ErrorEvent
 from datetime import datetime, timezone
@@ -68,8 +70,14 @@ def test_request_error(monkeypatch):
     assert len(result.error_groups) == 2
 
     group_data = result.error_groups["group-1"]
-    assert group_data.message == "The request was aborted because there was no available instance."
-    assert group_data.affected_services == ["eta-bot-container-milestone-generator", "eta-bot-shipment-milestone-generator"]
+    assert (
+        group_data.message
+        == "The request was aborted because there was no available instance."
+    )
+    assert group_data.affected_services == [
+        "eta-bot-container-milestone-generator",
+        "eta-bot-shipment-milestone-generator",
+    ]
     assert group_data.timestamps == [1775127600000, 1775131200000]
 
     # then: verify requests
@@ -93,3 +101,44 @@ def test_request_error(monkeypatch):
     list_events_request_2 = list_events_requests[1]
     assert isinstance(list_events_request_2, ListEventsRequest)
     assert list_events_request_2.group_id == "group-2"
+
+
+def test_response_code_filter(monkeypatch):
+    # given
+    def mock_list_group_stats(self, request):
+        mock_group_1 = ErrorGroupStats(
+            group=ErrorGroup(group_id="group-1"),
+            representative=ErrorEvent(
+                message="The request was aborted because there was no available instance.",
+                context=ErrorContext(
+                    http_request=HttpRequestContext(
+                        response_status_code=429,  # this is the response code that should be filtered
+                    )
+                ),
+            ),
+            affected_services=[
+                ServiceContext(service="eta-bot-container-milestone-generator"),
+            ],
+        )
+        return [mock_group_1]
+
+    monkeypatch.setattr(
+        ErrorStatsServiceClient, "list_group_stats", mock_list_group_stats
+    )
+
+    # given: create client
+    error_stats_service_client = ErrorStatsServiceClient()
+    error_report_client = ErrorReportClient(
+        project_id="event-service",
+        client=error_stats_service_client,
+    )
+
+    # when
+    result = error_report_client.request_error_report(
+        time_range=QueryTimeRange(period=3),
+        response_codes_to_filter=[429],
+    )
+
+    # then
+    assert isinstance(result, ErrorReport)
+    assert len(result.error_groups) == 0
