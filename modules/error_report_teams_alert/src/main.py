@@ -41,16 +41,17 @@ def find_and_report_errors(config: Config) -> Response:
 You are looking at a Google Cloud projects Error Reporting page grouped into error groups.
 The structure of the input data is a dictionary with the Error Report group id as the key and the Error Report as the value.
 Your function is to evaluate if any of the provided error groups have spiked or are currently spiking in error count.
-You do that by looking at the provided timestamps to see if there are sudden spikes. If there is a constant flow of events, they may be ignored.
-For context, the range of events sent is '{time_range.period.name}'.
+You do that by looking at the provided timestamps to see if there are spikes in occurence.
+For context, the time window of events sent below is '{time_range.period.name}'. If there is a constant flow of events (during the entire time window!), they may be ignored.
+But if a constant stream of errors starts somewhere inside the window, it is a spike aswell!
 Return a dict[str, str] with the Error Report group id as the key of the error you deem critical and set the value to a concise title stating the core error 
 and the change of amount from baseline to spike, like in these examples:
-'DatabaseError: 0/h → 300/h'
-'Invalid HTTP_HOST header: 10/min → 100/min'
+'DatabaseError: 0/h -> 300/h'
+'Invalid HTTP_HOST header: 10/min -> 100/min'
 If no errors are critical, then return an empty dict. Your response will be read by json.loads().
-Do not include any text before or after the JSON. 
-Do not use markdown code blocks.
-Example: {{"key": "value"}}
+Do NOT include any text before or after the JSON!
+Do NOT use markdown code blocks! (like ``` or ```json)
+The response MUST start with '{{' and end with '}}'!
 This is the data:
 {current_error_report.get_errors_as_string()}
     """
@@ -88,24 +89,8 @@ def main(_request: Request) -> Response:
     try:
         config = Config.load_from_env()
         response = find_and_report_errors(config)
-        return response  
+        return response
     except Exception as e:
         logger.error("Exception: %s", e)
         logger.exception(traceback.format_exc())
         return Response("Internal Server Error", status=500)
-
-
-def main_local():
-    config = Config(
-        project_id="nl-event-service-npr-416913",
-        region="europe-west1",
-        teams_webhook_url="https://prod-98.westeurope.logic.azure.com:443/workflows/d87c52cc77d94ccabea156f242ab93bd/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=um294cwX-C7gYMZ2DV7um9yVdwso7fFX8dwWPMJgJ6k",
-        request_period=3,
-        response_codes_to_filter=[429],
-        ai_model_id="gemini-2.5-flash",
-    )
-    find_and_report_errors(config)
-
-
-if __name__ == "__main__":
-    main_local()
