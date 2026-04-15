@@ -1,28 +1,6 @@
 import os
 
 
-# class Config:
-#     project_id: str
-#     region: str
-#     teams_webhook_url: str
-#     request_period: int
-#     response_codes_to_filter: list[int]
-#     ai_model_id: str
-
-#     def __init__(self) -> None:
-#         try:
-#             self.project_id = os.environ["PROJECT_ID"]
-#             self.region = os.environ["REGION"]
-#             self.teams_webhook_url = os.environ["TEAMS_WEBHOOK_URL"]
-#             self.request_period = int(os.environ["REQUEST_PERIOD"])
-#             self.response_codes_to_filter = [
-#                 int(code) for code in os.environ["RESPONSE_CODES_TO_FILTER"].split(",")
-#             ]
-#             self.ai_model_id = os.environ["AI_MODEL_ID"]
-#         except KeyError as e:
-#             raise RuntimeError(f"Missing environment variable: {e.args[0]}") from e
-
-
 class Config:
     project_id: str
     region: str
