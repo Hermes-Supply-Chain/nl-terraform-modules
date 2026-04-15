@@ -224,3 +224,6 @@ out/
 *.dat
 # python profiling files
 *.prof
+
+# ignore my local main files for testing
+**/main_local.py
