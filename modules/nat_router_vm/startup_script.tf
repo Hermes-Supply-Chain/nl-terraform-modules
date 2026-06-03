@@ -5,6 +5,11 @@ echo "Installing Ops Agent..." >> /startup-script.log
 curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
 sudo bash add-google-cloud-ops-agent-repo.sh --also-install
 
+%{if var.enable_cron_reboot}
+# have the VM reboot with a cronjob
+(sudo crontab -l 2>/dev/null; echo "${var.reboot_cron} /sbin/reboot") | sort - | uniq - | crontab -
+%{endif}
+
 # Function to find the network adapter name by IP address
 get_adapter_by_ip() {
     local ip_address="$1"

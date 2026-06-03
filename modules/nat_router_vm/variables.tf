@@ -71,3 +71,14 @@ variable "image" {
   description = "Which image the NAT router VM should use"
   default     = "debian-cloud/debian-12"
 }
+
+variable "enable_cron_reboot" {
+  type    = bool
+  default = true
+}
+
+variable "reboot_cron" {
+  type        = string
+  description = "A crontab entry is added by the startup script, to reboot the VM in the specified time"
+  default     = "0 4 * * *"
+}
